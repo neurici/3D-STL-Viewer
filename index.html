@@ -1,0 +1,825 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vizualizare 3D STL - @Cogian Sergiu</title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+        <style>
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 300px;
+                height: 100vh;
+                background: #fff;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+                padding: 20px;
+                overflow-y: auto;
+            }
+
+            #stl-container {
+                margin-left: 300px; /* Sidebar genişliği kadar */
+                width: calc(100% - 300px);
+                height: 100vh;
+            }
+
+            .controls {
+                background: none;
+                box-shadow: none;
+                padding: 0;
+                margin-bottom: 15px;
+            }
+
+            .control-section {
+                border-bottom: 1px solid #eee;
+                padding: 15px 0;
+            }
+
+            .control-section:last-child {
+                border-bottom: none;
+            }
+
+            .btn-group-vertical {
+                width: 100%;
+            }
+
+            .btn-group-vertical .btn {
+                text-align: left;
+                margin-bottom: 5px;
+            }
+
+            .model-info {
+                font-size: 0.875rem;
+                color: #666;
+            }
+
+            /* Mobil görünüm */
+            @media (max-width: 768px) {
+                .sidebar {
+                    position: fixed;
+                    top: auto;
+                    bottom: 0;
+                    left: 0;
+                    width: 100%;
+                    height: auto;
+                    max-height: 50vh;
+                    z-index: 1000;
+                    border-top: 1px solid #ddd;
+                }
+
+                #stl-container {
+                    margin-left: 0;
+                    width: 100%;
+                    height: calc(100vh - 50px);
+                }
+            }
+            
+            /* Dokunmatik göstergeleri için stil */
+            .touch-controls {
+                position: absolute;
+                bottom: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255, 255, 255, 0.8);
+                padding: 5px 15px;
+                border-radius: 20px;
+                font-size: 0.8rem;
+                display: none; /* Başlangıçta gizli */
+                z-index: 1000;
+            }
+            
+            .view-controls .btn {
+                padding: 0.375rem 0.5rem;
+                font-size: 0.875rem;
+            }
+            
+            @media (max-width: 768px) {
+                .view-controls {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 0.25rem;
+                }
+                .view-controls .btn {
+                    width: 100%;
+                }
+            }
+
+            .view-buttons {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+
+            .view-buttons .btn-group {
+                display: flex;
+                justify-content: stretch;
+            }
+
+            .view-buttons .btn {
+                flex: 1;
+                padding: 0.25rem 0.5rem;
+                font-size: 0.75rem;
+            }
+
+            .control-section {
+                padding: 10px 0;
+            }
+
+            /* Tooltip desteği için */
+            [title] {
+                position: relative;
+            }
+
+            .file-drop-zone {
+                border: 2px dashed #03995B;
+                border-radius: 8px;
+                padding: 20px;
+                text-align: center;
+                background: #f8f9fa;
+                transition: all 0.3s ease;
+                cursor: pointer;
+            }
+
+            .file-drop-zone:hover {
+                border-color: #025a36;
+                background: #e9ecef;
+            }
+
+            .file-drop-zone label {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                cursor: pointer;
+                color: #03995B;
+            }
+
+            .file-drop-zone i {
+                font-size: 2rem;
+            }
+
+            .file-drop-zone .upload-text {
+                font-size: 0.9rem;
+                color: #666;
+            }
+
+            /* Model Controls için buton stilleri */
+            .model-controls .btn {
+                padding: 0.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .model-controls .btn i {
+                font-size: 1.1rem;
+            }
+
+            .model-controls .btn.active {
+                background-color: #03995B;
+                border-color: #03995B;
+                color: white;
+            }
+
+            .watermark {
+                position: fixed;
+                right: 20px;
+                top: 20px;
+                font-size: 1.5rem;
+                font-weight: bold;
+                color: #F00;
+                opacity: 0.95;
+                z-index: 1000;
+                pointer-events: none;
+                mix-blend-mode: difference; /* Arka plan rengine göre otomatik kontrast */
+                text-shadow: 
+                    -1px -1px 0 rgba(255,255,255,0.5),
+                    1px -1px 0 rgba(255,255,255,0.5),
+                    -1px 1px 0 rgba(255,255,255,0.5),
+                    1px 1px 0 rgba(255,255,255,0.5);
+            }
+
+            /* Mobil görünüm için watermark ayarı */
+            @media (max-width: 768px) {
+                .watermark {
+                    font-size: 1.2rem;
+                    right: 10px;
+                    top: 10px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="watermark">Vizualizare 3D STL - Cogian Sergiu</div>
+        <div class="container mt-4">
+            <div class="sidebar">
+                <div class="control-section">
+                    <div class="file-drop-zone mb-3">
+                        <input type="file" id="stl-file" accept=".stl" class="d-none">
+                        <label for="stl-file" class="mb-0 w-100">
+                            <i class="bi bi-cloud-upload"></i>
+                            <span class="upload-text">Plasați fișierul STL aici sau dați clic pentru a încărca</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h6 class="mb-2">Tip Vizualizare</h6>
+                    <div class="view-buttons">
+                        <div class="btn-group btn-group-sm mb-2" role="group">
+                            <button class="btn btn-outline-secondary" data-view="front">Față</button>
+                            <button class="btn btn-outline-secondary" data-view="back">Spate</button>
+                            <button class="btn btn-outline-secondary" data-view="left">Stânga</button>
+                            <button class="btn btn-outline-secondary" data-view="right">Dreapta</button>
+                        </div>
+                        <div class="btn-group btn-group-sm mb-2" role="group">
+                            <button class="btn btn-outline-secondary" data-view="top">Sus</button>
+                            <button class="btn btn-outline-secondary" data-view="bottom">Jos</button>
+                            <button class="btn btn-outline-secondary" data-view="iso">ISO</button>
+                            <button class="btn btn-outline-secondary" data-view="iso2">ISO 2</button>
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-secondary" data-view="fit">Potrivire</button>
+                            <button class="btn btn-outline-secondary" data-view="home">Acasă</button>
+                        </div>
+                        <div class="btn-group btn-group-sm mb-2" role="group">
+                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('all')" title="Afișare grile">
+                                <i class="bi bi-grid-3x3"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('xy')" title="Toggle XY Grid">XY</button>
+                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('xz')" title="Toggle XZ Grid">XZ</button>
+                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('yz')" title="Toggle YZ Grid">YZ</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h6 class="mb-2">Control Model</h6>
+                    <div class="model-controls d-flex gap-1 mb-2">
+                        <button class="btn btn-sm btn-outline-secondary flex-grow-1" id="rotate-left" title="Rotire Stânga">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary flex-grow-1" id="auto-rotate" title="Auto Rotație">
+                            <i class="bi bi-play-circle-fill"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary flex-grow-1" id="rotate-right" title="Rotire Dreapta">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary flex-grow-1" id="reset-model" title="Resetare Vizualizare">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h6 class="mb-3">Setări Afișare</h6>
+                    <div class="mb-2">
+                        <label class="form-label small">Culoare Model</label>
+                        <input type="color" id="model-color" class="form-control form-control-sm" value="#808080">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Fundal</label>
+                        <input type="color" id="background-color" class="form-control form-control-sm" value="#FFFFFF">
+                    </div>
+                    <div>
+                        <label class="form-label small">Intensitate Lumină</label>
+                        <input type="range" id="light-intensity" class="form-range" min="0" max="2" step="0.1" value="1">
+                    </div>
+                </div>
+
+                <div class="control-section">
+                    <h6 class="mb-2">Informații Model</h6>
+                    <div class="model-info">
+                        <div>Triunghiuri: <span id="triangle-count">0</span></div>
+                        <div>Dimensiuni: <span id="dimensions">0 x 0 x 0</span></div>
+                        <div>Volum: <span id="volume">0</span> mm³</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="stl-container">
+                <div class="touch-controls">
+                    Trageți pentru a rotire • Ciupiți pentru mărire
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+        <script>
+            class STLViewer {
+                constructor(containerId) {
+                    this.container = document.getElementById(containerId);
+                    this.scene = new THREE.Scene();
+                    this.camera = new THREE.PerspectiveCamera(45, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
+                    this.renderer = new THREE.WebGLRenderer({ 
+                        antialias: true,
+                        alpha: true 
+                    });
+                    this.controls = null;
+                    this.model = null;
+                    this.lights = [];
+                    this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    this.touchControls = null;
+                    this.errorModal = null;
+                    this.autoRotate = false;
+
+                    this.init();
+                    this.setupLights();
+                    this.animate();
+                    this.setupControls();
+                    this.setupTouchControls();
+                }
+
+                init() {
+                    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                    this.renderer.setPixelRatio(window.devicePixelRatio);
+                    this.renderer.shadowMap.enabled = true;
+                    this.container.appendChild(this.renderer.domElement);
+                    
+                    // White background
+                    this.scene.background = new THREE.Color(0xFFFFFF);
+                    
+                    // Second grid (for vertical grid)
+                    const size = 200; // Grid size increased
+                    const divisions = 40; // More divisions
+                    const gridHelper = new THREE.GridHelper(size, divisions);
+                    gridHelper.material.opacity = 0.25;
+                    gridHelper.material.transparent = true;
+                    this.scene.add(gridHelper);
+                    
+                    // Second grid (for vertical grid)
+                    const gridHelperXZ = new THREE.GridHelper(size, divisions);
+                    gridHelperXZ.material.opacity = 0.25;
+                    gridHelperXZ.material.transparent = true;
+                    gridHelperXZ.rotation.x = Math.PI / 2;
+                    this.scene.add(gridHelperXZ);
+                    
+                    // Third grid (for side grid)
+                    const gridHelperYZ = new THREE.GridHelper(size, divisions);
+                    gridHelperYZ.material.opacity = 0.25;
+                    gridHelperYZ.material.transparent = true;
+                    gridHelperYZ.rotation.z = Math.PI / 2;
+                    this.scene.add(gridHelperYZ);
+                    
+                    // Axes helper'ı güncelle
+                    const axesHelper = new THREE.AxesHelper(100);
+                    this.scene.add(axesHelper);
+                    
+                    // OrbitControls ayarlarını güncelle - kısıtlamaları kaldır
+                    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                    this.controls.enableDamping = true;
+                    this.controls.dampingFactor = 0.05;
+                    this.controls.screenSpacePanning = true;
+                    this.controls.minDistance = 10;
+                    this.controls.maxDistance = 500;
+                    
+                    // Update initial camera position
+                    this.camera.position.set(100, 100, 100);
+                    this.camera.lookAt(0, 0, 0);
+                    
+                    // Renderer ayarlarını güncelle
+                    this.renderer.setClearColor(0xf0f0f0); // Light gray background
+                    this.renderer.shadowMap.enabled = true;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    
+                    // Mobile device optimizations
+                    if (this.isMobile) {
+                        this.setupMobileControls();
+                        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // For performance
+                        
+                        // Touch control indicator
+                        this.touchControls = this.container.querySelector('.touch-controls');
+                        if (this.touchControls) {
+                            this.touchControls.style.display = 'block';
+                            
+                            // Hide indicator after 5 seconds
+                            setTimeout(() => {
+                                this.touchControls.style.opacity = '0';
+                                this.touchControls.style.transition = 'opacity 0.5s';
+                            }, 5000);
+                        }
+                    }
+
+                    // Responsive resizing
+                    window.addEventListener('resize', () => {
+                        this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+                        this.camera.updateProjectionMatrix();
+                        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                        
+                        // For mobile landscape/portrait transitions
+                        if (this.isMobile) {
+                            this.handleOrientationChange();
+                        }
+                    });
+                }
+
+                setupLights() {
+                    this.lights.forEach(light => this.scene.remove(light));
+                    this.lights = [];
+
+                    // Ambient light
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                    this.scene.add(ambientLight);
+                    this.lights.push(ambientLight);
+
+                    // Directional lights
+                    const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                    mainLight.position.set(1, 1, 1);
+                    this.scene.add(mainLight);
+                    this.lights.push(mainLight);
+
+                    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+                    fillLight.position.set(-1, 0.5, -1);
+                    this.scene.add(fillLight);
+                    this.lights.push(fillLight);
+                }
+
+                animate() {
+                    requestAnimationFrame(() => this.animate());
+                    
+                    if (this.autoRotate && this.model) {
+                        this.model.rotation.y += 0.01;
+                    }
+                    
+                    this.controls.update();
+                    this.renderer.render(this.scene, this.camera);
+                }
+
+                loadSTL(file) {
+                    try {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const loader = new THREE.STLLoader();
+                                const geometry = loader.parse(e.target.result);
+                                
+                                // Calculate model information
+                                this.updateModelInfo(geometry);
+                                
+                                const material = new THREE.MeshPhongMaterial({
+                                    color: 0x808080,
+                                    specular: 0x111111,
+                                    shininess: 30,
+                                    side: THREE.DoubleSide,
+                                    transparent: true,
+                                    opacity: 0.95, // More opaque
+                                    flatShading: true // For CAD-like appearance
+                                });
+
+                                if (this.model) {
+                                    this.scene.remove(this.model);
+                                }
+
+                                this.model = new THREE.Mesh(geometry, material);
+                                this.model.castShadow = true;
+                                this.model.receiveShadow = true;
+                                
+                                // Center geometry
+                                geometry.computeBoundingBox();
+                                const box = geometry.boundingBox;
+                                const center = new THREE.Vector3();
+                                box.getCenter(center);
+                                geometry.translate(-center.x, -center.y, -center.z);
+                                
+                                // Auto-scale model
+                                const size = box.getSize(new THREE.Vector3());
+                                const maxDim = Math.max(size.x, size.y, size.z);
+                                const scale = 30 / maxDim; // Slightly larger scale
+                                this.model.scale.set(scale, scale, scale);
+                                
+                                // Position model above y-axis zero
+                                const boxHeight = box.max.y - box.min.y;
+                                this.model.position.y = (boxHeight * scale) / 2;
+
+                                this.scene.add(this.model);
+                                
+                                // Auto fit view when model is loaded
+                                this.changeView('iso');
+
+                                // Show model info card
+                                document.querySelector('.model-info').style.display = 'block';
+                            } catch (error) {
+                                this.showError('Invalid STL file: ' + error.message);
+                            }
+                        };
+                        
+                        reader.onerror = () => {
+                            this.showError('Error reading file');
+                        };
+                        
+                        reader.readAsArrayBuffer(file);
+                    } catch (error) {
+                        this.showError('Error loading file: ' + error.message);
+                    }
+                }
+
+                setupControls() {
+                    document.getElementById('model-color').addEventListener('change', (e) => {
+                        if (this.model) {
+                            this.model.material.color.setStyle(e.target.value);
+                        }
+                    });
+
+                    document.getElementById('background-color').addEventListener('change', (e) => {
+                        this.scene.background = new THREE.Color(e.target.value);
+                    });
+
+                    document.getElementById('light-intensity').addEventListener('input', (e) => {
+                        this.lights.forEach(light => {
+                            light.intensity = parseFloat(e.target.value);
+                        });
+                    });
+
+                    // View Controls butonları için event listener'ları güncelle
+                    document.querySelectorAll('[data-view]').forEach(button => {
+                        button.addEventListener('click', () => {
+                            const view = button.dataset.view;
+                            this.changeView(view);
+                        });
+                    });
+                }
+
+                setupMobileControls() {
+                    // Mobile device optimizations
+                    this.renderer.shadowMap.enabled = false; // Disable shadows
+                    this.renderer.powerPreference = "high-performance";
+                }
+
+                handleOrientationChange() {
+                    // Update camera settings for landscape/portrait transitions
+                    const aspect = this.container.clientWidth / this.container.clientHeight;
+                    this.camera.aspect = aspect;
+                    
+                    if (aspect < 1) { // Portrait mode
+                        this.camera.position.z = 50;
+                    } else { // Landscape mode
+                        this.camera.position.z = 40;
+                    }
+                    
+                    this.camera.updateProjectionMatrix();
+                    if (this.model) {
+                        this.controls.reset();
+                    }
+                }
+
+                changeView(view) {
+                    if (!this.model) return;
+
+                    const box = new THREE.Box3().setFromObject(this.model);
+                    const size = box.getSize(new THREE.Vector3());
+                    const center = box.getCenter(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const distance = maxDim * 2;
+
+                    const positions = {
+                        front: [0, 0, distance],
+                        back: [0, 0, -distance],
+                        left: [-distance, 0, 0],
+                        right: [distance, 0, 0],
+                        top: [0, distance, 0],
+                        bottom: [0, -distance, 0],
+                        iso: [distance, distance, distance],
+                        iso2: [-distance, distance, distance], // Second isometric view
+                        home: [distance * 0.8, distance * 0.6, distance * 0.8], // Default view
+                        fit: null
+                    };
+
+                    if (view === 'fit') {
+                        // Modeli görünüm alanına sığdır
+                        const fov = this.camera.fov * (Math.PI / 180);
+                        const fovh = 2 * Math.atan(Math.tan(fov / 2) * this.camera.aspect);
+                        const dx = size.x / 2 / Math.tan(fovh / 2);
+                        const dy = size.y / 2 / Math.tan(fov / 2);
+                        const dz = Math.max(dx, dy);
+                        
+                        this.camera.position.set(center.x + dz, center.y + dz, center.z + dz);
+                    } else if (view === 'home') {
+                        const pos = positions.home;
+                        this.camera.position.set(...pos);
+                        // Slight angled rotation
+                        this.model.rotation.set(-Math.PI / 12, Math.PI / 6, 0);
+                    } else {
+                        const pos = positions[view];
+                        if (pos) {
+                            this.camera.position.set(...pos);
+                            // Special rotation for isometric views
+                            if (view.startsWith('iso')) {
+                                this.model.rotation.set(0, Math.PI / 4, 0);
+                            } else {
+                                this.model.rotation.set(0, 0, 0);
+                            }
+                        }
+                    }
+
+                    // Kamerayı modelin merkezine bak
+                    this.camera.lookAt(center);
+                    this.controls.target.copy(center);
+                    
+                    this.controls.enableDamping = true;
+                    this.controls.dampingFactor = 0.05;
+                    this.controls.update();
+                }
+
+                setupTouchControls() {
+                    if (!this.isMobile) return;
+
+                    const hammer = new Hammer(this.container);
+                    
+                    // Pinch to zoom
+                    hammer.get('pinch').set({ enable: true });
+                    hammer.on('pinchstart', () => {
+                        this.controls.enableZoom = false;
+                    });
+                    
+                    hammer.on('pinch', (e) => {
+                        const scale = e.scale;
+                        const camera = this.camera;
+                        const distance = camera.position.distanceTo(this.controls.target);
+                        const newDistance = distance / scale;
+                        
+                        if (newDistance >= this.controls.minDistance && 
+                            newDistance <= this.controls.maxDistance) {
+                            camera.position.multiplyScalar(1/scale);
+                        }
+                    });
+
+                    hammer.on('pinchend', () => {
+                        this.controls.enableZoom = true;
+                    });
+
+                    // Rotate gesture
+                    hammer.on('pan', (e) => {
+                        if (this.model) {
+                            this.model.rotation.y += e.velocityX * 0.5;
+                            this.model.rotation.x += e.velocityY * 0.5;
+                        }
+                    });
+                }
+
+                updateModelInfo(geometry) {
+                    // Triangle count
+                    document.getElementById('triangle-count').textContent = 
+                        geometry.attributes.position.count / 3;
+                    
+                    // Dimensions
+                    geometry.computeBoundingBox();
+                    const box = geometry.boundingBox;
+                    const size = box.getSize(new THREE.Vector3());
+                    document.getElementById('dimensions').textContent = 
+                        `${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)} mm`;
+                    
+                    // Hacim (yaklaşık)
+                    const volume = size.x * size.y * size.z;
+                    document.getElementById('volume').textContent = 
+                        volume.toFixed(2);
+                }
+
+                showError(message) {
+                    const errorMessageEl = document.getElementById('error-message');
+                    if (errorMessageEl) {
+                        errorMessageEl.textContent = message;
+                    }
+                    
+                    // Modal'ı lazy olarak başlat
+                    if (!this.errorModal) {
+                        const modalEl = document.getElementById('errorModal');
+                        if (modalEl) {
+                            this.errorModal = new bootstrap.Modal(modalEl);
+                        }
+                    }
+                    
+                    // Show modal
+                    if (this.errorModal) {
+                        this.errorModal.show();
+                    }
+                }
+
+                resetModel() {
+                    if (this.model) {
+                        this.model.rotation.set(0, 0, 0);
+                        this.changeView('iso');
+                    }
+                }
+
+                rotateModel(direction) {
+                    if (this.model) {
+                        const rotationAmount = direction === 'left' ? 0.1 : -0.1;
+                        this.model.rotation.y += rotationAmount;
+                    }
+                }
+
+                toggleAutoRotate() {
+                    this.autoRotate = !this.autoRotate;
+                    const button = document.getElementById('auto-rotate');
+                    if (this.autoRotate) {
+                        button.innerHTML = '<i class="bi bi-pause-circle"></i>  Oprire Rotație';
+                        button.classList.add('active');
+                    } else {
+                        button.innerHTML = '<i class="bi bi-play-circle"></i>  Auto Rotație';
+                        button.classList.remove('active');
+                    }
+                }
+
+                // Yeni metod: Grid görünürlüğünü kontrol etmek için
+                toggleGrid(axis) {
+                    const grids = this.scene.children.filter(child => child instanceof THREE.GridHelper);
+                    switch(axis) {
+                        case 'xy':
+                            grids[0].visible = !grids[0].visible;
+                            break;
+                        case 'xz':
+                            grids[1].visible = !grids[1].visible;
+                            break;
+                        case 'yz':
+                            grids[2].visible = !grids[2].visible;
+                            break;
+                        case 'all':
+                            const visibility = !grids[0].visible;
+                            grids.forEach(grid => grid.visible = visibility);
+                            break;
+                    }
+                }
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                // STL Viewer'ı başlat
+                window.viewer = new STLViewer('stl-container');
+
+                // File loading operations
+                const fileInput = document.getElementById('stl-file');
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        viewer.loadSTL(file);
+                    }
+                });
+
+                // Drag-drop support
+                const dropZone = document.querySelector('.file-drop-zone');
+                
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = '#0d6efd';
+                    dropZone.style.background = '#f8f9fa';
+                });
+
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.style.borderColor = '#dee2e6';
+                    dropZone.style.background = '#fff';
+                });
+
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = '#dee2e6';
+                    dropZone.style.background = '#fff';
+                    
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.name.toLowerCase().endsWith('.stl')) {
+                        viewer.loadSTL(file);
+                    }
+                });
+
+                // Event listeners ekleyelim
+                document.getElementById('rotate-left').addEventListener('click', () => {
+                    viewer.rotateModel('left');
+                });
+
+                document.getElementById('rotate-right').addEventListener('click', () => {
+                    viewer.rotateModel('right');
+                });
+
+                document.getElementById('reset-model').addEventListener('click', () => {
+                    viewer.resetModel();
+                });
+
+                document.getElementById('auto-rotate').addEventListener('click', () => {
+                    viewer.toggleAutoRotate();
+                });
+            });
+        </script>
+
+        <!-- Error modal -->
+        <div class="modal fade" id="errorModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Eroare</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="error-message"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Închide</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
