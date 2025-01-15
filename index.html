@@ -193,7 +193,7 @@
                 opacity: 0.95;
                 z-index: 1000;
                 pointer-events: none;
-                mix-blend-mode: difference; /* Arka plan rengine göre otomatik kontrast */
+                mix-blend-mode: difference; /* Contrastul automat bazat pe culoarea de fundal */
                 text-shadow: 
                     -1px -1px 0 rgba(255,255,255,0.5),
                     1px -1px 0 rgba(255,255,255,0.5),
@@ -248,9 +248,9 @@
                             <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('all')" title="Afișare grile">
                                 <i class="bi bi-grid-3x3"></i>
                             </button>
-                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('xy')" title="Toggle XY Grid">XY</button>
-                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('xz')" title="Toggle XZ Grid">XZ</button>
-                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('yz')" title="Toggle YZ Grid">YZ</button>
+                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('xy')" title="Afișare grilă XY">XY</button>
+                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('xz')" title="Afișare grilă XZ">XZ</button>
+                            <button class="btn btn-outline-secondary" onclick="viewer.toggleGrid('yz')" title="Afișare grilă YZ">YZ</button>
                         </div>
                     </div>
                 </div>
@@ -505,17 +505,17 @@
                                 // Show model info card
                                 document.querySelector('.model-info').style.display = 'block';
                             } catch (error) {
-                                this.showError('Invalid STL file: ' + error.message);
+                                this.showError('Fișier STL invalid: ' + error.message);
                             }
                         };
                         
                         reader.onerror = () => {
-                            this.showError('Error reading file');
+                            this.showError('Eroare accesare fișier');
                         };
                         
                         reader.readAsArrayBuffer(file);
                     } catch (error) {
-                        this.showError('Error loading file: ' + error.message);
+                        this.showError('Eroare încărcare fișier: ' + error.message);
                     }
                 }
 
@@ -536,7 +536,7 @@
                         });
                     });
 
-                    // View Controls butonları için event listener'ları güncelle
+                    // View Controls
                     document.querySelectorAll('[data-view]').forEach(button => {
                         button.addEventListener('click', () => {
                             const view = button.dataset.view;
